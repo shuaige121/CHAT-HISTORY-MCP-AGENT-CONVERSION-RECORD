@@ -385,7 +385,11 @@ async function main() {
   });
 
   // Ensure list handlers exist even when no tools/resources/prompts are registered.
-  server.server.registerCapabilities({ tools: { listChanged: false } });
+  server.server.registerCapabilities({
+    tools: { listChanged: false },
+    resources: { listChanged: false },
+    prompts: { listChanged: false }
+  });
   server.server.setRequestHandler(ListToolsRequestSchema, () => ({ tools: [] }));
   server.server.setRequestHandler(ListResourcesRequestSchema, () => ({ resources: [] }));
   server.server.setRequestHandler(ListPromptsRequestSchema, () => ({ prompts: [] }));
