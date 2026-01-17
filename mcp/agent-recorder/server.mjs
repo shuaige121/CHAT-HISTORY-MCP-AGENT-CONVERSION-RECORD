@@ -4,6 +4,11 @@ import path from "node:path";
 import os from "node:os";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import {
+  ListToolsRequestSchema,
+  ListResourcesRequestSchema,
+  ListPromptsRequestSchema
+} from "@modelcontextprotocol/sdk/types.js";
 
 const HOME = os.homedir();
 const SESSIONS_ROOT = process.env.CODEX_SESSIONS_DIR || path.join(HOME, ".codex", "sessions");
@@ -378,6 +383,12 @@ async function main() {
     name: "codex-agent-recorder",
     version: "0.1.0"
   });
+
+  // Ensure list handlers exist even when no tools/resources/prompts are registered.
+  server.server.registerCapabilities({ tools: { listChanged: false } });
+  server.server.setRequestHandler(ListToolsRequestSchema, () => ({ tools: [] }));
+  server.server.setRequestHandler(ListResourcesRequestSchema, () => ({ resources: [] }));
+  server.server.setRequestHandler(ListPromptsRequestSchema, () => ({ prompts: [] }));
 
   const transport = new StdioServerTransport();
   await server.connect(transport);
