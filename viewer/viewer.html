@@ -1,0 +1,1029 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AI Agent Record Viewer</title>
+  <style>
+    :root {
+      --bg: #f4f1ec;
+      --bg-2: #e9e2d8;
+      --ink: #1e1a17;
+      --muted: #6b625b;
+      --accent: #0f6b6b;
+      --accent-glow: rgba(15,107,107,0.18);
+      --btn-bg: #0f6b6b;
+      --btn-text: #ffffff;
+      --btn-border: #0f6b6b;
+      --btn-secondary-text: #0f6b6b;
+      --btn-ghost-text: #6b625b;
+      --card: #fffaf4;
+      --line: #e1d7cc;
+      --shadow: 0 10px 30px rgba(0,0,0,0.08);
+      --active: #f0faf8;
+      --select: #f5efdc;
+      --font-scale: 1;
+    }
+    :root[data-theme="dark"] {
+      --bg: #0b0a09;
+      --bg-2: #141210;
+      --ink: #e8e1d9;
+      --muted: #aaa199;
+      --accent: #267979;
+      --accent-glow: rgba(38,121,121,0.35);
+      --btn-bg: #1f5a5a;
+      --btn-text: #efe7df;
+      --btn-border: #2a7f7f;
+      --btn-secondary-text: #8fc2c2;
+      --btn-ghost-text: #aaa199;
+      --card: #151311;
+      --line: #23201d;
+      --shadow: 0 10px 30px rgba(0,0,0,0.35);
+      --active: #141f1c;
+      --select: #1c1814;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root[data-theme="auto"] {
+        --bg: #0b0a09;
+        --bg-2: #141210;
+        --ink: #e8e1d9;
+        --muted: #aaa199;
+        --accent: #267979;
+        --accent-glow: rgba(38,121,121,0.35);
+        --btn-bg: #1f5a5a;
+        --btn-text: #efe7df;
+        --btn-border: #2a7f7f;
+        --btn-secondary-text: #8fc2c2;
+        --btn-ghost-text: #aaa199;
+        --card: #151311;
+        --line: #23201d;
+        --shadow: 0 10px 30px rgba(0,0,0,0.35);
+        --active: #141f1c;
+        --select: #1c1814;
+      }
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "IBM Plex Sans", "Fira Sans", "Noto Sans", sans-serif;
+      color: var(--ink);
+      background: radial-gradient(circle at 10% 10%, var(--bg-2) 0, var(--bg) 35%, var(--bg) 100%);
+      font-size: calc(16px * var(--font-scale));
+    }
+    header {
+      padding: 20px 28px;
+      border-bottom: 1px solid var(--line);
+      background: linear-gradient(135deg, var(--bg-2), var(--bg));
+    }
+    .header-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 18px;
+      flex-wrap: wrap;
+    }
+    .header-left h1 {
+      margin: 0;
+      font-size: calc(20px * var(--font-scale));
+      letter-spacing: 0.5px;
+    }
+    .header-left p { margin: 6px 0 0; color: var(--muted); }
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+    .now {
+      font-variant-numeric: tabular-nums;
+      font-size: calc(13px * var(--font-scale));
+      color: var(--muted);
+      padding: 6px 10px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: var(--card);
+    }
+    .header-controls {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: calc(12px * var(--font-scale));
+    }
+    .header-controls label {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      color: var(--muted);
+    }
+    .header-controls select {
+      border: 1px solid var(--line);
+      background: var(--card);
+      color: var(--ink);
+      border-radius: 8px;
+      padding: 4px 6px;
+    }
+    .header-controls input[type="range"] {
+      accent-color: var(--accent);
+    }
+    
+
+    .wrap {
+      display: grid;
+      grid-template-columns: 320px 1fr;
+      gap: 16px;
+      padding: 16px;
+    }
+
+    .panel {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      box-shadow: var(--shadow);
+      padding: 14px;
+      min-height: 75vh;
+    }
+
+    .btn {
+      background: var(--btn-bg);
+      color: var(--btn-text);
+      border: none;
+      padding: 10px 12px;
+      border-radius: 10px;
+      cursor: pointer;
+      font-weight: 600;
+    }
+    .btn.secondary {
+      background: transparent;
+      color: var(--btn-secondary-text);
+      border: 1px solid var(--btn-border);
+    }
+    .btn.ghost {
+      background: transparent;
+      color: var(--btn-ghost-text);
+      border: 1px dashed var(--line);
+    }
+    .btn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+    .small { font-size: calc(12px * var(--font-scale)); color: var(--muted); }
+
+    .session-list {
+      list-style: none;
+      padding: 0;
+      margin: 12px 0 0;
+      display: grid;
+      gap: 10px;
+    }
+
+    .session-item {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 10px;
+      cursor: pointer;
+      background: var(--card);
+      transition: transform 120ms ease;
+    }
+    .session-item:hover { transform: translateY(-2px); }
+    .session-item.active {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 2px var(--accent-glow);
+    }
+
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px 12px;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+    .controls input[type="text"] {
+      flex: 1;
+      min-width: 220px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 8px 10px;
+      background: var(--card);
+      color: var(--ink);
+    }
+    .controls input[type="number"] {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 6px 8px;
+      background: var(--card);
+      color: var(--ink);
+    }
+
+    .log {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 8px;
+      max-height: 55vh;
+      overflow: auto;
+      background: var(--card);
+    }
+
+    .msg {
+      padding: 8px 10px;
+      border-bottom: 1px dashed var(--line);
+      cursor: pointer;
+    }
+    .msg:last-child { border-bottom: none; }
+    .msg.active { background: var(--active); }
+    .msg.selected { background: var(--select); }
+    .msg .meta { font-size: calc(12px * var(--font-scale)); color: var(--muted); }
+    .msg .row { display: flex; gap: 8px; align-items: flex-start; margin-top: 4px; }
+    .msg .check { margin-top: 2px; }
+    .msg .text { white-space: pre-wrap; }
+
+    .resume {
+      margin-top: 12px;
+      display: grid;
+      gap: 8px;
+    }
+    textarea {
+      width: 100%;
+      min-height: 140px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 8px 10px;
+      font-family: "IBM Plex Sans", "Fira Sans", "Noto Sans", sans-serif;
+      background: var(--card);
+      color: var(--ink);
+    }
+
+    @media (max-width: 980px) {
+      .wrap { grid-template-columns: 1fr; }
+      .panel { min-height: auto; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="header-row">
+      <div class="header-left">
+        <h1 data-i18n="title">AI Agent Record Viewer</h1>
+        <p class="small" data-i18n="subtitle">选择日志文件夹 -> 浏览会话 -> 选择一段作为“续接点”。</p>
+      </div>
+      <div class="header-right">
+        <div id="now" class="now">--</div>
+        <div class="header-controls">
+          <label><span data-i18n="lang_label">语言</span>
+            <select id="lang"></select>
+          </label>
+          <label><span data-i18n="theme_label">主题</span>
+            <select id="theme"></select>
+          </label>
+          <label><span data-i18n="font_label">字体</span>
+            <input id="fontSize" type="range" min="85" max="130" value="100" />
+          </label>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <div class="wrap">
+    <section class="panel">
+      <button id="pick" class="btn" data-i18n="pick_folder">选择记录文件夹</button>
+      <p id="folderInfo" class="small" style="margin-top:8px;" data-i18n="folder_none">未选择</p>
+      <ul id="sessionList" class="session-list"></ul>
+    </section>
+
+    <section class="panel">
+      <div class="controls">
+        <label><input type="checkbox" id="showSystem" checked /> <span data-i18n="system_label">系统记录</span></label>
+        <label><input type="checkbox" id="showUser" checked /> <span data-i18n="user_label">用户发言</span></label>
+        <label><input type="checkbox" id="showAssistant" checked /> <span data-i18n="assistant_label">助手回复</span></label>
+        <label><input type="checkbox" id="showTools" checked /> <span data-i18n="tools_label">工具记录</span></label>
+        <label><input type="checkbox" id="showEvents" /> <span data-i18n="events_label">事件记录</span></label>
+        <input id="search" type="text" data-i18n-placeholder="search_placeholder" placeholder="搜索文本" />
+      </div>
+      <div class="controls">
+        <button id="multiToggle" class="btn secondary" data-i18n="multi_select">多选</button>
+        <button id="clearSelect" class="btn ghost" data-i18n="clear_selected">清空</button>
+        <span id="selectedCount" class="small">已选 0</span>
+      </div>
+      <div id="log" class="log"></div>
+
+      <div class="resume">
+        <div class="controls">
+          <label><span data-i18n="max_items_label">最多条数</span> <input id="limit" type="number" min="0" value="30" style="width:80px;" /></label>
+          <button id="copy" class="btn" disabled data-i18n="copy_button">复制续接内容</button>
+        </div>
+        <div class="controls">
+          <label><span data-i18n="agent_cmd_label">启动命令</span>
+            <input id="agentCmd" type="text" data-i18n-placeholder="agent_cmd_placeholder" placeholder="比如：co 或 codex" style="width:220px;" />
+          </label>
+          <button id="start" class="btn" disabled data-i18n="start_button">从这里开始</button>
+        </div>
+        <div id="launchStatus" class="small"></div>
+        <textarea id="resumeOut" data-i18n-placeholder="resume_placeholder" placeholder="选择某一条记录后，这里会生成续接上下文"></textarea>
+        <p class="small" data-i18n="resume_hint">提示：如果你想从某一条开始，点击那条记录即可。</p>
+      </div>
+    </section>
+  </div>
+
+<script>
+const state = {
+  sessions: new Map(),
+  selectedId: null,
+  selectedIndex: null,
+  folderName: '',
+  multiSelect: false,
+  selectedSet: new Set(),
+  lastRecords: []
+};
+
+const pickBtn = document.getElementById('pick');
+const folderInfo = document.getElementById('folderInfo');
+const sessionList = document.getElementById('sessionList');
+const logEl = document.getElementById('log');
+const searchEl = document.getElementById('search');
+const showSystemEl = document.getElementById('showSystem');
+const showUserEl = document.getElementById('showUser');
+const showAssistantEl = document.getElementById('showAssistant');
+const showToolsEl = document.getElementById('showTools');
+const showEventsEl = document.getElementById('showEvents');
+const multiToggleEl = document.getElementById('multiToggle');
+const clearSelectEl = document.getElementById('clearSelect');
+const selectedCountEl = document.getElementById('selectedCount');
+const resumeOut = document.getElementById('resumeOut');
+const copyBtn = document.getElementById('copy');
+const limitEl = document.getElementById('limit');
+const agentCmdEl = document.getElementById('agentCmd');
+const startBtn = document.getElementById('start');
+const launchStatusEl = document.getElementById('launchStatus');
+const nowEl = document.getElementById('now');
+const langEl = document.getElementById('lang');
+const themeEl = document.getElementById('theme');
+const fontSizeEl = document.getElementById('fontSize');
+
+const I18N = {
+  zh: {
+    title: 'AI Agent Record Viewer',
+    subtitle: '选择日志文件夹 -> 浏览会话 -> 选择一段作为“续接点”。',
+    pick_folder: '选择记录文件夹',
+    folder_none: '未选择',
+    system_label: '系统记录',
+    user_label: '用户发言',
+    assistant_label: '助手回复',
+    tools_label: '工具记录',
+    events_label: '事件记录',
+    search_placeholder: '搜索文本',
+    max_items_label: '最多条数',
+    copy_button: '复制续接内容',
+    resume_placeholder: '选择某一条记录后，这里会生成续接上下文',
+    resume_hint: '提示：如果你想从某一条开始，点击那条记录即可。',
+    session_untitled: '(未命名)',
+    resume_header: '续接上下文',
+    resume_continue: '请从这里继续对话。',
+    font_label: '字号',
+    lang_label: '语言',
+    theme_label: '主题',
+    theme_auto: '跟随系统',
+    theme_light: '亮色',
+    theme_dark: '暗色',
+    lang_zh: '中文',
+    lang_en: 'English',
+    multi_select: '多选',
+    multi_select_exit: '退出多选',
+    clear_selected: '清空',
+    selected_count: '已选 {n} 条',
+    start_button: '从这里开始',
+    agent_cmd_label: '启动命令',
+    agent_cmd_placeholder: '比如：co 或 codex',
+    launch_ok: '已拉起终端，文件：{path}',
+    launch_failed: '启动器未运行，已复制到剪贴板。',
+    kind_chat: '对话',
+    kind_system: '系统记录',
+    kind_tools: '工具记录',
+    kind_events: '事件记录',
+    role_user: '用户',
+    role_assistant: '助手',
+    role_system: '系统',
+    role_developer: '开发者'
+  },
+  en: {
+    title: 'AI Agent Record Viewer',
+    subtitle: 'Pick a folder → browse sessions → choose a resume point.',
+    pick_folder: 'Pick Record Folder',
+    folder_none: 'None selected',
+    system_label: 'System Notes',
+    user_label: 'User',
+    assistant_label: 'Assistant',
+    tools_label: 'Tool Log',
+    events_label: 'Event Log',
+    search_placeholder: 'Search text',
+    max_items_label: 'Max items',
+    copy_button: 'Copy resume text',
+    resume_placeholder: 'Click a message to generate resume context here',
+    resume_hint: 'Tip: click a message to continue from that point.',
+    session_untitled: '(untitled)',
+    resume_header: 'Resume Context',
+    resume_continue: 'Continue the conversation from here.',
+    font_label: 'Font',
+    lang_label: 'Language',
+    theme_label: 'Theme',
+    theme_auto: 'System',
+    theme_light: 'Light',
+    theme_dark: 'Dark',
+    lang_zh: '中文',
+    lang_en: 'English',
+    multi_select: 'Multi-select',
+    multi_select_exit: 'Exit multi-select',
+    clear_selected: 'Clear',
+    selected_count: '{n} selected',
+    start_button: 'Start from here',
+    agent_cmd_label: 'Agent command',
+    agent_cmd_placeholder: 'e.g. co or codex',
+    launch_ok: 'Terminal launched. File: {path}',
+    launch_failed: 'Launcher not running. Copied to clipboard.',
+    kind_chat: 'Chat',
+    kind_system: 'System Notes',
+    kind_tools: 'Tool Log',
+    kind_events: 'Event Log',
+    role_user: 'User',
+    role_assistant: 'Assistant',
+    role_system: 'System',
+    role_developer: 'Developer'
+  }
+};
+
+const storedLang = localStorage.getItem('viewer_lang');
+let currentLang = storedLang || (navigator.language && navigator.language.startsWith('zh') ? 'zh' : 'en');
+const storedTheme = localStorage.getItem('viewer_theme');
+let currentTheme = storedTheme || 'auto';
+const storedFontScale = localStorage.getItem('viewer_font_scale');
+let currentFontScale = storedFontScale ? Number(storedFontScale) : 100;
+const storedAgentCmd = localStorage.getItem('viewer_agent_cmd');
+let currentAgentCmd = storedAgentCmd || 'codex';
+const LAUNCH_ENDPOINT = 'http://127.0.0.1:8765/launch';
+
+agentCmdEl.value = currentAgentCmd;
+
+function clamp(num, min, max) {
+  return Math.min(max, Math.max(min, num));
+}
+
+function t(key) {
+  return (I18N[currentLang] && I18N[currentLang][key]) || (I18N.en && I18N.en[key]) || key;
+}
+
+function formatSelectedCount(n) {
+  const template = t('selected_count');
+  if (template.includes('{n}')) return template.replace('{n}', String(n));
+  return `${n}`;
+}
+
+function updateSelectedCount() {
+  selectedCountEl.textContent = formatSelectedCount(state.selectedSet.size);
+  clearSelectEl.disabled = state.selectedSet.size === 0;
+}
+
+function updateMultiToggleLabel() {
+  multiToggleEl.textContent = state.multiSelect ? t('multi_select_exit') : t('multi_select');
+}
+
+function updateStartEnabled() {
+  startBtn.disabled = !(state.selectedSet.size > 0 || state.selectedIndex != null);
+}
+
+function setLaunchStatus(message) {
+  launchStatusEl.textContent = message || '';
+}
+
+function applyI18n() {
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    const key = el.getAttribute('data-i18n');
+    el.textContent = t(key);
+  });
+  document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+    const key = el.getAttribute('data-i18n-placeholder');
+    el.setAttribute('placeholder', t(key));
+  });
+
+  langEl.innerHTML = '';
+  const langOptions = [
+    { value: 'zh', label: t('lang_zh') },
+    { value: 'en', label: t('lang_en') }
+  ];
+  langOptions.forEach(opt => {
+    const o = document.createElement('option');
+    o.value = opt.value;
+    o.textContent = opt.label;
+    if (opt.value === currentLang) o.selected = true;
+    langEl.appendChild(o);
+  });
+
+  themeEl.innerHTML = '';
+  const themeOptions = [
+    { value: 'auto', label: t('theme_auto') },
+    { value: 'light', label: t('theme_light') },
+    { value: 'dark', label: t('theme_dark') }
+  ];
+  themeOptions.forEach(opt => {
+    const o = document.createElement('option');
+    o.value = opt.value;
+    o.textContent = opt.label;
+    if (opt.value === currentTheme) o.selected = true;
+    themeEl.appendChild(o);
+  });
+
+  folderInfo.textContent = state.folderName || t('folder_none');
+  updateSelectedCount();
+  updateMultiToggleLabel();
+  updateStartEnabled();
+}
+
+function applyTheme() {
+  document.documentElement.dataset.theme = currentTheme;
+}
+
+function applyFontScale() {
+  const min = Number(fontSizeEl.min || '85');
+  const max = Number(fontSizeEl.max || '130');
+  const scale = clamp(Number(currentFontScale) || 100, min, max);
+  currentFontScale = scale;
+  document.documentElement.style.setProperty('--font-scale', String(scale / 100));
+  fontSizeEl.value = String(scale);
+}
+
+function updateClock() {
+  const locale = currentLang === 'zh' ? 'zh-CN' : 'en-US';
+  const fmt = new Intl.DateTimeFormat(locale, {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    weekday: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit'
+  });
+  nowEl.textContent = fmt.format(new Date());
+}
+
+function safeJson(line) {
+  try { return JSON.parse(line); } catch { return null; }
+}
+
+function parseFilename(name) {
+  const base = name.replace(/\.(jsonl|md)$/i, '');
+  const parts = base.split('__');
+  let kind = null;
+  if (parts.length >= 2) {
+    const tail = parts[parts.length - 1];
+    if (['dialog','system','tools','events','chat','system-notes','tool-log','event-log','all'].includes(tail)) {
+      kind = tail;
+      parts.pop();
+    }
+  }
+  let project = null, title = null, sessionId = null, ts = null;
+  if (parts.length >= 4) {
+    [project, title, sessionId, ts] = parts;
+  } else if (parts.length === 3) {
+    [project, sessionId, ts] = parts;
+  }
+  return { project, title, sessionId, ts, kind };
+}
+
+function normalizeKind(kind) {
+  switch (kind) {
+    case 'dialog':
+    case 'chat':
+      return 'chat';
+    case 'system':
+    case 'system-notes':
+      return 'system';
+    case 'tools':
+    case 'tool-log':
+      return 'tools';
+    case 'events':
+    case 'event-log':
+      return 'events';
+    default:
+      return kind || 'chat';
+  }
+}
+
+function kindLabel(kind) {
+  switch (kind) {
+    case 'chat': return t('kind_chat');
+    case 'system': return t('kind_system');
+    case 'tools': return t('kind_tools');
+    case 'events': return t('kind_events');
+    default: return kind;
+  }
+}
+
+function roleLabel(role) {
+  switch (role) {
+    case 'user': return t('role_user');
+    case 'assistant': return t('role_assistant');
+    case 'system': return t('role_system');
+    case 'developer': return t('role_developer');
+    default: return role || '';
+  }
+}
+
+function ensureSession(id) {
+  if (!state.sessions.has(id)) {
+    state.sessions.set(id, { id, project: 'unknown', title: '', startedAt: '', records: [], files: {}, nextId: 0 });
+  }
+  return state.sessions.get(id);
+}
+
+async function walkDir(dirHandle, pathPrefix = '') {
+  const entries = [];
+  for await (const [name, handle] of dirHandle.entries()) {
+    const fullPath = pathPrefix ? `${pathPrefix}/${name}` : name;
+    if (handle.kind === 'directory') {
+      entries.push(...await walkDir(handle, fullPath));
+    } else if (handle.kind === 'file' && name.endsWith('.jsonl')) {
+      entries.push({ handle, path: fullPath, name });
+    }
+  }
+  return entries;
+}
+
+function addRecord(session, rec) {
+  if (rec && rec._id == null) {
+    rec._id = session.nextId++;
+  }
+  session.records.push(rec);
+}
+
+function normalizeRecord(kind, obj) {
+  if (!obj) return null;
+  if (obj.type === 'session_meta') return null;
+  if (obj.role && obj.text) {
+    return { ts: obj.ts, role: obj.role, text: obj.text, kind, type: 'message' };
+  }
+  if (obj.type === 'tool_call') {
+    return { ts: obj.ts, kind, type: 'tool_call', name: obj.name, text: obj.arguments };
+  }
+  if (obj.type === 'tool_output') {
+    return { ts: obj.ts, kind, type: 'tool_output', name: obj.name, text: obj.output };
+  }
+  if (obj.type === 'event' || obj.type === 'reasoning_summary') {
+    return { ts: obj.ts, kind, type: obj.type, text: obj.text || '' };
+  }
+  return null;
+}
+
+async function loadFolder() {
+  state.sessions.clear();
+  sessionList.innerHTML = '';
+  logEl.innerHTML = '';
+  resumeOut.value = '';
+  copyBtn.disabled = true;
+  state.selectedId = null;
+  state.selectedIndex = null;
+  state.selectedSet.clear();
+  state.lastRecords = [];
+  updateSelectedCount();
+  updateStartEnabled();
+  setLaunchStatus('');
+
+  const dirHandle = await window.showDirectoryPicker();
+  state.folderName = dirHandle.name;
+  folderInfo.textContent = state.folderName;
+  const files = await walkDir(dirHandle);
+
+  for (const f of files) {
+    const file = await f.handle.getFile();
+    const text = await file.text();
+    const lines = text.split(/\n/).filter(Boolean);
+    const info = parseFilename(f.name);
+
+    let sessionId = info.sessionId || null;
+    let startedAt = '';
+    let project = info.project || 'unknown';
+    let title = info.title || '';
+    let kind = normalizeKind(info.kind || 'chat');
+
+    for (const line of lines) {
+      const obj = safeJson(line);
+      if (!obj) continue;
+      if (obj.type === 'session_meta') {
+        sessionId = obj.session_id || sessionId || 'unknown';
+        startedAt = obj.started_at || startedAt;
+        project = obj.project || project;
+        kind = normalizeKind(obj.kind || kind);
+        continue;
+      }
+      if (!sessionId) sessionId = 'unknown';
+      const session = ensureSession(sessionId);
+      session.project = project;
+      if (!session.title && title) session.title = title;
+      if (!session.startedAt && startedAt) session.startedAt = startedAt;
+      session.files[kind] = f.path;
+      const rec = normalizeRecord(kind, obj);
+      if (rec) addRecord(session, rec);
+    }
+  }
+
+  // compute title fallback from first user message
+  for (const session of state.sessions.values()) {
+    if (!session.title) {
+      const firstUser = session.records.find(r => r.role === 'user');
+      if (firstUser) {
+        session.title = firstUser.text.slice(0, 40).replace(/\s+/g, ' ');
+      }
+    }
+  }
+
+  renderSessionList();
+}
+
+function renderSessionList() {
+  const items = Array.from(state.sessions.values());
+  items.sort((a,b) => (b.startedAt || '').localeCompare(a.startedAt || ''));
+  sessionList.innerHTML = '';
+
+  for (const s of items) {
+    const li = document.createElement('li');
+    li.className = 'session-item' + (state.selectedId === s.id ? ' active' : '');
+    li.dataset.id = s.id;
+    li.innerHTML = `
+      <div><strong>${s.title || t('session_untitled')}</strong></div>
+      <div class="small">${s.project} · ${s.startedAt || ''}</div>
+      <div class="small">${s.id}</div>
+    `;
+    li.addEventListener('click', () => selectSession(s.id));
+    sessionList.appendChild(li);
+  }
+}
+
+function getFilteredRecords(session) {
+  const showSystem = showSystemEl.checked;
+  const showUser = showUserEl.checked;
+  const showAssistant = showAssistantEl.checked;
+  const showTools = showToolsEl.checked;
+  const showEvents = showEventsEl.checked;
+  const q = (searchEl.value || '').toLowerCase();
+
+  return session.records
+    .filter(r => {
+      if (r.kind === 'system' && !showSystem) return false;
+      if (r.kind === 'tools' && !showTools) return false;
+      if (r.kind === 'events' && !showEvents) return false;
+      if (r.role === 'user' && !showUser) return false;
+      if (r.role === 'assistant' && !showAssistant) return false;
+      if ((r.role === 'system' || r.role === 'developer') && !showSystem) return false;
+      if (q && !(r.text || '').toLowerCase().includes(q)) return false;
+      return true;
+    })
+    .sort((a,b) => (a.ts || '').localeCompare(b.ts || '') || ((a._id || 0) - (b._id || 0)));
+}
+
+function renderLog() {
+  const prevScrollTop = logEl.scrollTop;
+  const hadScroll = logEl.scrollHeight > 0;
+  logEl.innerHTML = '';
+
+  const session = state.sessions.get(state.selectedId);
+  if (!session) return;
+
+  const records = getFilteredRecords(session);
+  state.lastRecords = records;
+  if (state.selectedIndex != null && state.selectedIndex >= records.length) {
+    state.selectedIndex = null;
+  }
+  records.forEach((r, idx) => {
+    const div = document.createElement('div');
+    const isSelected = state.selectedSet.has(r._id);
+    const isActive = !state.multiSelect && state.selectedIndex === idx;
+    div.className = 'msg' + (isActive ? ' active' : '') + (isSelected ? ' selected' : '');
+    const role = r.role ? roleLabel(r.role) : (r.type ? r.type : kindLabel(r.kind));
+    const head = `[${r.ts || ''}] ${role}` + (r.name ? ` (${r.name})` : '');
+    const checkbox = state.multiSelect ? `<input class="check" type="checkbox" ${isSelected ? 'checked' : ''} />` : '';
+    div.innerHTML = `
+      <div class="meta">${head}</div>
+      <div class="row">${checkbox}<div class="text">${r.text || ''}</div></div>
+    `;
+    if (state.multiSelect) {
+      div.addEventListener('click', () => {
+        if (state.selectedSet.has(r._id)) {
+          state.selectedSet.delete(r._id);
+        } else {
+          state.selectedSet.add(r._id);
+        }
+        updateSelectedCount();
+        renderLog();
+      });
+    } else {
+      div.addEventListener('click', () => {
+        state.selectedIndex = idx;
+        state.selectedSet.clear();
+        updateSelectedCount();
+        renderLog();
+      });
+    }
+    logEl.appendChild(div);
+  });
+
+  if (state.selectedSet.size > 0) {
+    generateResume(getSelectedRecords(session));
+  } else if (state.selectedIndex != null && records.length) {
+    generateResume(records.slice(state.selectedIndex));
+  } else {
+    generateResume([]);
+  }
+  updateStartEnabled();
+  if (hadScroll) logEl.scrollTop = prevScrollTop;
+}
+
+function getSelectedRecords(session) {
+  const selected = [];
+  for (const r of session.records) {
+    if (state.selectedSet.has(r._id)) selected.push(r);
+  }
+  selected.sort((a, b) => (a.ts || '').localeCompare(b.ts || '') || ((a._id || 0) - (b._id || 0)));
+  return selected;
+}
+
+function buildResume(records) {
+  const limit = Number(limitEl.value || '0');
+  let slice = records.slice();
+  if (limit > 0 && slice.length > limit) {
+    slice = slice.slice(-limit);
+  }
+  const lines = [];
+  lines.push('# ' + t('resume_header'));
+  for (const r of slice) {
+    const role = r.role ? roleLabel(r.role) : (r.type ? r.type : kindLabel(r.kind));
+    const name = r.name ? ` (${r.name})` : '';
+    lines.push(`[${r.ts || ''}] ${role}${name}:`);
+    lines.push(String(r.text || ''));
+    lines.push('');
+  }
+  lines.push(t('resume_continue'));
+  return lines.join('\n');
+}
+
+function generateResume(records) {
+  if (!records || !records.length) {
+    resumeOut.value = '';
+    copyBtn.disabled = true;
+    return;
+  }
+  resumeOut.value = buildResume(records);
+  copyBtn.disabled = false;
+}
+
+async function copyToClipboard(text) {
+  if (!text) return false;
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch {}
+  try {
+    resumeOut.select();
+    document.execCommand('copy');
+    return true;
+  } catch {}
+  return false;
+}
+
+async function launchAgent(text, session) {
+  const cmd = (agentCmdEl.value || '').trim() || currentAgentCmd || 'codex';
+  currentAgentCmd = cmd;
+  localStorage.setItem('viewer_agent_cmd', cmd);
+  agentCmdEl.value = cmd;
+
+  try {
+    const res = await fetch(LAUNCH_ENDPOINT, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        text,
+        cmd,
+        title: session && session.title ? session.title : '',
+        sessionId: session && session.id ? session.id : '',
+        project: session && session.project ? session.project : ''
+      })
+    });
+    if (!res.ok) throw new Error('bad status');
+    const data = await res.json();
+    const msg = t('launch_ok').replace('{path}', data.path || '');
+    setLaunchStatus(msg);
+  } catch {
+    setLaunchStatus(t('launch_failed'));
+  }
+}
+
+function selectSession(id) {
+  state.selectedId = id;
+  state.selectedIndex = null;
+  state.selectedSet.clear();
+  updateSelectedCount();
+  updateStartEnabled();
+  setLaunchStatus('');
+  renderSessionList();
+  renderLog();
+}
+
+function refreshUI() {
+  applyI18n();
+  applyTheme();
+  applyFontScale();
+  updateClock();
+  renderSessionList();
+  renderLog();
+}
+
+pickBtn.addEventListener('click', loadFolder);
+searchEl.addEventListener('input', renderLog);
+showSystemEl.addEventListener('change', renderLog);
+showUserEl.addEventListener('change', renderLog);
+showAssistantEl.addEventListener('change', renderLog);
+showToolsEl.addEventListener('change', renderLog);
+showEventsEl.addEventListener('change', renderLog);
+multiToggleEl.addEventListener('click', () => {
+  state.multiSelect = !state.multiSelect;
+  if (state.multiSelect) {
+    if (state.selectedIndex != null && state.lastRecords.length) {
+      const rec = state.lastRecords[state.selectedIndex];
+      if (rec && rec._id != null) state.selectedSet.add(rec._id);
+    }
+    state.selectedIndex = null;
+  } else {
+    if (state.selectedSet.size > 0 && state.lastRecords.length) {
+      const idx = state.lastRecords.findIndex(r => state.selectedSet.has(r._id));
+      state.selectedIndex = idx >= 0 ? idx : null;
+    }
+    state.selectedSet.clear();
+  }
+  updateMultiToggleLabel();
+  updateSelectedCount();
+  renderLog();
+});
+clearSelectEl.addEventListener('click', () => {
+  state.selectedSet.clear();
+  state.selectedIndex = null;
+  updateSelectedCount();
+  renderLog();
+});
+langEl.addEventListener('change', () => {
+  currentLang = langEl.value;
+  localStorage.setItem('viewer_lang', currentLang);
+  refreshUI();
+});
+themeEl.addEventListener('change', () => {
+  currentTheme = themeEl.value;
+  localStorage.setItem('viewer_theme', currentTheme);
+  applyTheme();
+});
+fontSizeEl.addEventListener('input', () => {
+  currentFontScale = Number(fontSizeEl.value || '100');
+  localStorage.setItem('viewer_font_scale', String(currentFontScale));
+  applyFontScale();
+});
+agentCmdEl.addEventListener('change', () => {
+  const cmd = (agentCmdEl.value || '').trim();
+  if (cmd) {
+    currentAgentCmd = cmd;
+    localStorage.setItem('viewer_agent_cmd', cmd);
+  }
+});
+limitEl.addEventListener('input', () => {
+  if (state.selectedId != null) {
+    const session = state.sessions.get(state.selectedId);
+    const records = getFilteredRecords(session);
+    if (state.selectedSet.size > 0) {
+      generateResume(getSelectedRecords(session));
+    } else if (state.selectedIndex != null) {
+      generateResume(records.slice(state.selectedIndex));
+    } else {
+      generateResume([]);
+    }
+  }
+});
+
+copyBtn.addEventListener('click', async () => {
+  await copyToClipboard(resumeOut.value || '');
+});
+startBtn.addEventListener('click', async () => {
+  const session = state.sessions.get(state.selectedId);
+  if (!session) return;
+  let records = [];
+  if (state.selectedSet.size > 0) {
+    records = getSelectedRecords(session);
+  } else if (state.selectedIndex != null && state.lastRecords.length) {
+    records = state.lastRecords.slice(state.selectedIndex);
+  }
+  if (!records.length) return;
+  const text = buildResume(records);
+  resumeOut.value = text;
+  copyBtn.disabled = false;
+  await copyToClipboard(text);
+  await launchAgent(text, session);
+});
+
+applyTheme();
+applyI18n();
+applyFontScale();
+updateClock();
+setInterval(updateClock, 1000);
+</script>
+</body>
+</html>

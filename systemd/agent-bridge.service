@@ -1,0 +1,9 @@
+[Unit]
+Description=Agent bridge for AI Agent Record Viewer
+
+[Service]
+ExecStart=%h/.local/bin/agent-bridge
+Restart=on-failure
+
+[Install]
+WantedBy=default.target

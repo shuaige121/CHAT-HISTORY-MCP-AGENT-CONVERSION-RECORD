@@ -1,0 +1,14 @@
+name: i18n README check
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  readme-i18n:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check README i18n drift
+        run: node scripts/check-i18n-readme.js
+        continue-on-error: true

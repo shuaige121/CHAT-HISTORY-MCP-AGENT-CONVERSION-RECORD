@@ -1,0 +1,114 @@
+#!/usr/bin/env python3
+import json
+import os
+import re
+import shutil
+import subprocess
+import time
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+DEFAULT_PORT = int(os.environ.get("AGENT_BRIDGE_PORT", "8765"))
+DEFAULT_CMD = os.environ.get("AGENT_BRIDGE_CMD", "codex")
+
+def resolve_base_dir():
+    env_dir = os.environ.get("AGENT_BRIDGE_OUT_DIR")
+    if env_dir:
+        return os.path.expanduser(env_dir)
+    record_dir = os.environ.get("AI_AGENT_RECORD_DIR")
+    if record_dir:
+        return os.path.expanduser(record_dir)
+    return os.path.expanduser("~/Desktop/ai agent record")
+
+def safe_name(text):
+    text = text or "resume"
+    text = re.sub(r"[^A-Za-z0-9._-]+", "_", text).strip("_")
+    return (text[:60] or "resume")
+
+def copy_to_clipboard(text):
+    if shutil.which("xclip"):
+        subprocess.run(["xclip", "-selection", "clipboard"], input=text, text=True)
+        return True
+    if shutil.which("wl-copy"):
+        subprocess.run(["wl-copy"], input=text, text=True)
+        return True
+    return False
+
+def pick_terminal():
+    for cmd in ["gnome-terminal", "kgx", "x-terminal-emulator", "xterm", "konsole"]:
+        if shutil.which(cmd):
+            return cmd
+    return None
+
+def launch_terminal(shell_cmd):
+    term = pick_terminal()
+    if not term:
+        subprocess.Popen(["bash", "-lc", shell_cmd], start_new_session=True)
+        return
+    if term in ["gnome-terminal", "kgx"]:
+        args = [term, "--", "bash", "-lc", shell_cmd]
+    elif term == "konsole":
+        args = [term, "-e", "bash", "-lc", shell_cmd]
+    else:
+        args = [term, "-e", "bash", "-lc", shell_cmd]
+    subprocess.Popen(args, start_new_session=True)
+
+class Handler(BaseHTTPRequestHandler):
+    def _send(self, status=200, payload=None):
+        self.send_response(status)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Access-Control-Allow-Methods", "POST, OPTIONS")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+        self.end_headers()
+        if payload is not None:
+            self.wfile.write(json.dumps(payload).encode("utf-8"))
+
+    def do_OPTIONS(self):
+        self._send(204, {})
+
+    def do_POST(self):
+        if self.path != "/launch":
+            self._send(404, {"ok": False, "error": "not_found"})
+            return
+        try:
+            length = int(self.headers.get("Content-Length", "0"))
+            raw = self.rfile.read(length).decode("utf-8") if length else "{}"
+            payload = json.loads(raw) if raw else {}
+        except Exception:
+            self._send(400, {"ok": False, "error": "bad_json"})
+            return
+
+        text = payload.get("text") or ""
+        cmd = (payload.get("cmd") or DEFAULT_CMD).strip() or DEFAULT_CMD
+        title = payload.get("title") or payload.get("sessionId") or payload.get("project") or "resume"
+
+        base_dir = resolve_base_dir()
+        export_dir = os.path.join(base_dir, "exports")
+        os.makedirs(export_dir, exist_ok=True)
+        ts = time.strftime("%Y%m%d_%H%M%S")
+        filename = f"{safe_name(title)}_{ts}.md"
+        out_path = os.path.join(export_dir, filename)
+        with open(out_path, "w", encoding="utf-8") as f:
+            f.write(text)
+
+        copied = False
+        if text:
+            copied = copy_to_clipboard(text)
+
+        shell_cmd = f'cd "{os.path.expanduser("~")}"'
+        shell_cmd += f' ; echo "Resume saved: {out_path}"'
+        if copied:
+            shell_cmd += ' ; echo "Clipboard: copied"'
+        shell_cmd += f' ; echo "----" ; cat "{out_path}" ; echo'
+        shell_cmd += f' ; {cmd}'
+
+        launch_terminal(shell_cmd)
+        self._send(200, {"ok": True, "path": out_path, "copied": copied})
+
+def main():
+    server = ThreadingHTTPServer(("127.0.0.1", DEFAULT_PORT), Handler)
+    print(f"agent-bridge listening on 127.0.0.1:{DEFAULT_PORT}")
+    server.serve_forever()
+
+if __name__ == "__main__":
+    main()
