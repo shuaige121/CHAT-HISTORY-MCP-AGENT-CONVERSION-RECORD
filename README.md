@@ -70,4 +70,4 @@ PRs are welcome. If you change `README.md`, update the translation stubs and ref
 
 ## License
 
-License is not specified yet.
+MIT License. See `LICENSE`.
